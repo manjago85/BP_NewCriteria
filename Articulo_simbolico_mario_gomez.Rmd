@@ -1,0 +1,293 @@
+---
+title: "Articulo_simbolico_mario_gomez"
+author: "Mario Gómez"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(RSDA)
+library(FactoMineR)
+library(nloptr)
+
+```
+
+# Aplicación de métodos
+
+```{r eval = FALSE}
+
+source("funciones_bestpoint.R")
+
+data("facedata")
+attr(facedata,"concept") <- attr(facedata,"row.names")
+
+#Facedata
+res11 <- sym.pca.complete(facedata,method = "centers")
+res12 <- sym.pca.complete(facedata,method = "optimized.distance")
+res13 <- sym.pca.complete(facedata,method = "optimized.variance")
+res14 <- sym.pca.complete(facedata,method = "optimized.ind.cos2")
+res15 <- sym.pca.complete(facedata,method = "optimized.var.cos2")
+res16 <- sym.pca.complete(facedata,method = "optimized.angles")
+
+```
+
+# Optimización multi-objetivo
+
+```{r eval=FALSE}
+sym.data <- RSDA:::to.v2(facedata)
+
+N <- sym.data$N
+M <- sym.data$M
+seq.min <- seq(from = 1, by = 2, length.out = M)
+seq.max <- seq(from = 2, by = 2, length.out = M)
+sym.var.names <- sym.data$sym.var.names
+sym.data.vertex <- RSDA:::vertex.interval.new.j(sym.data)
+sym.data.vertex.matrix <- sym.data.vertex$vertex
+dim.vertex <- dim(sym.data.vertex.matrix)[1]
+tot.individuals <- N + dim.vertex
+min.interval <- as.matrix(sym.data$data[, seq.min])
+max.interval <- as.matrix(sym.data$data[, seq.max])
+
+nvar <- N*M
+bounds <- cbind(as.numeric(min.interval),as.numeric(max.interval)) 
+nobj <- 5
+minmax <- rep(FALSE,nobj)
+popsize <- 100
+archsize <- 100
+maxrun <- 1000
+prec <- matrix(1.e-3, nrow = 1, ncol = nobj)
+
+results <- caRamel2(nobj,
+                    nvar,
+                    minmax,
+                    bounds,
+                    fitness,
+                    popsize,
+                    archsize,
+                    maxrun,
+                    prec,
+                    carallel=FALSE,
+                    graph = FALSE) 
+
+pfn <- dim(results$parameters)[1]
+optimmo <- results$parameters[pfn,]
+
+res17 <- evalfun(x = optimmo, d = 3)
+class(res17) <- c("symbolic_pca_optimized", class(res17))
+
+```
+
+# Carga de funciones y datos
+
+```{r}
+source("funciones_bestpoint.R")
+
+load("face_list.Rdata")
+res11 <- face_list[[1]]
+res12 <- face_list[[2]]
+res13 <- face_list[[3]]
+res14 <- face_list[[4]]
+res15 <- face_list[[5]]
+res16 <- face_list[[6]]
+res17 <- face_list[[7]]
+
+```
+
+# Matriz de resultados
+
+```{r}
+facematrix <- matrix(NA,nrow = 7,ncol = 5)
+
+#Dist
+facematrix[1,1] <- sum(res11$pca.opt$ind.sup$dist)
+facematrix[2,1] <- sum(res12$pca.opt$ind.sup$dist)
+facematrix[3,1] <- sum(res13$pca.opt$ind.sup$dist)
+facematrix[4,1] <- sum(res14$pca.opt$ind.sup$dist)
+facematrix[5,1] <- sum(res15$pca.opt$ind.sup$dist)
+facematrix[6,1] <- sum(res16$pca.opt$ind.sup$dist)
+facematrix[7,1] <- sum(res17$pca.opt$ind.sup$dist)
+
+#Var
+facematrix[1,2] <- res11$pca.opt$eig[3,3]
+facematrix[2,2] <- res12$pca.opt$eig[3,3]
+facematrix[3,2] <- res13$pca.opt$eig[3,3]
+facematrix[4,2] <- res14$pca.opt$eig[3,3]
+facematrix[5,2] <- res15$pca.opt$eig[3,3]
+facematrix[6,2] <- res16$pca.opt$eig[3,3]
+facematrix[7,2] <- res17$pca.opt$eig[3,3]
+
+#IndR
+facematrix[1,3] <- sum(res11$pca.opt$ind.sup$cos2[,1:3])
+facematrix[2,3] <- sum(res12$pca.opt$ind.sup$cos2[,1:3])
+facematrix[3,3] <- sum(res13$pca.opt$ind.sup$cos2[,1:3])
+facematrix[4,3] <- sum(res14$pca.opt$ind.sup$cos2[,1:3])
+facematrix[5,3] <- sum(res15$pca.opt$ind.sup$cos2[,1:3])
+facematrix[6,3] <- sum(res16$pca.opt$ind.sup$cos2[,1:3])
+facematrix[7,3] <- sum(res17$pca.opt$ind.sup$cos2[,1:3])
+
+#VarR
+facematrix[1,4] <- sum(res11$IPrinCore[,2:7]^2)
+facematrix[2,4] <- sum(res12$IPrinCore[,2:7]^2)
+facematrix[3,4] <- sum(res13$IPrinCore[,2:7]^2)
+facematrix[4,4] <- sum(res14$IPrinCore[,2:7]^2)
+facematrix[5,4] <- sum(res15$IPrinCore[,2:7]^2)
+facematrix[6,4] <- sum(res16$IPrinCore[,2:7]^2)
+facematrix[7,4] <- sum(res17$IPrinCore[,2:7]^2)
+
+#Ang
+facematrix[1,5] <- sum(apply(res11$IPrinCore[,-1],1,thetasfun)^2)
+facematrix[2,5] <- sum(apply(res12$IPrinCore[,-1],1,thetasfun)^2)
+facematrix[3,5] <- sum(apply(res13$IPrinCore[,-1],1,thetasfun)^2)
+facematrix[4,5] <- sum(apply(res14$IPrinCore[,-1],1,thetasfun)^2)
+facematrix[5,5] <- sum(apply(res15$IPrinCore[,-1],1,thetasfun)^2)
+facematrix[6,5] <- sum(apply(res16$IPrinCore[,-1],1,thetasfun)^2)
+facematrix[7,5] <- sum(apply(res17$IPrinCore[,-1],1,thetasfun)^2)
+
+
+```
+
+# Grafico de indivuos
+
+```{r}
+par(mfrow = c(4,2),mar = c(2,2,2,2))
+plot(res11,xlim = c(-6,6),ylim=c(-6,6),main = "Centers", label = "none")
+plot(res12,xlim = c(-6,6),ylim=c(-6,6),main = "BP Dist", label = "none")
+plot(res13,xlim = c(-6,6),ylim=c(-6,6),main = "BP Var", label = "none")
+plot(res14,xlim = c(-6,6),ylim=c(-6,6),main = "BP IndR", label = "none")
+plot(res15,xlim = c(-6,6),ylim=c(-6,6),main = "BP VarR", label = "none")
+plot(res16,xlim = c(-6,6),ylim=c(-6,6),main = "BP Ang", label = "none")
+plot(res17,xlim = c(-6,6),ylim=c(-6,6),main = "BP Mo", label = "none")
+par(mfrow = c(1,1))
+
+```
+
+# Gráfico de variables
+
+```{r}
+par(mfrow = c(4,2),mar = c(2,2,2,2))
+plot.sym.core(res11$IPrinCore,"Centers")
+plot.sym.core(res12$IPrinCore,"BP Dist")
+plot.sym.core(res13$IPrinCore,"BP Var")
+plot.sym.core(res14$IPrinCore,"BP IndR")
+plot.sym.core(res15$IPrinCore,"BP VarR")
+plot.sym.core(res16$IPrinCore,"BP Ang")
+plot.sym.core(res17$IPrinCore,"BP Mo")
+par(mfrow = c(1,1))
+
+```
+
+# Resultados
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(ggplot2)
+library(viridis)
+library(prismatic)
+
+criterios <- c("Dist","Var","IndR",
+               "VarR","Ang")
+metodos <- c("Centers","BP Dist","BP Var",
+             "BP IndR","BP VarR","BP Ang","BP Mo")
+colnames(facematrix) <- criterios   
+rownames(facematrix) <- metodos
+
+facematrix_l <- as.data.frame(facematrix) %>% 
+  rownames_to_column("Metodo") %>% 
+  pivot_longer(!Metodo,
+               names_to = "Criterio",
+               values_to = "Valor") %>%
+  mutate(Metodo = factor(Metodo,levels = metodos),
+         Criterio = factor(Criterio,levels = criterios))
+
+facematrixs <- apply(facematrix,2,unif.scale)
+
+facematrixs_l <- as.data.frame(facematrixs) %>% 
+  rownames_to_column("Metodo") %>% 
+  pivot_longer(!Metodo,
+               names_to = "Criterio",
+               values_to = "Valor") %>%
+  mutate(Metodo = factor(Metodo,levels = metodos),
+         Criterio = factor(Criterio,levels = criterios))
+
+facematrixs_l$Valor_orig <- facematrix_l$Valor
+
+ggplot(facematrixs_l, aes(x = Criterio, 
+                          y = Metodo, 
+                          fill = Valor)) +
+  geom_tile(color = "white",
+            lwd = 1.5,
+            linetype = 1) +
+  geom_text(aes(label = round(Valor_orig,1)),
+            color = "white", 
+            size = 3) +
+  scale_x_discrete(position = "top") +
+  scale_y_discrete(limits=rev) +
+  labs(x = NULL, 
+       y = NULL,
+       fill = NULL) +
+  theme(legend.position = "bottom", 
+        legend.direction = "horizontal",
+        legend.text = element_text(size = 8),
+        legend.title = element_text(size = 8),
+        legend.margin=margin(t=5),
+        axis.text.x = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        plot.margin=unit(c(0,0,0,0),"mm")) +
+  guides(fill = guide_colourbar(title.position="top",
+                                title.hjust = 0.5,
+                                barwidth = 10,
+                                barheight = 0.5)) +
+  scale_fill_gradientn(colours=mako(6, begin = 0.1, end = 0.9),
+                       breaks=c(0,1),labels=c("min","max"),
+                       limits=c(0,1)) +
+  #scale_fill_viridis(option = "mako",begin = 0.1,end = 0.9) +
+  coord_fixed()
+
+```
+
+# Componentes
+
+```{r}
+library(stringr)
+
+dflist <- vector(mode = "list",length = 6)
+
+for(i in 2:7){
+  z <- as.numeric(unlist(face_list[[i]]$pca.opt$ind$coord))
+  df <- RSDA:::as.data.frame.symbolic_interval(face_list[[i]]$Sym.Components)
+  df$z <- z
+  
+  int_df <- df %>% rownames_to_column("id") %>%
+    dplyr::mutate(Dim = str_sub(id,start = 1L,end = 5L),
+                  ind = str_extract(id, "[^.]+$")) %>% 
+    filter(Dim == "Dim.1" | Dim == "Dim.2") %>% 
+    pivot_longer(cols = c(min,max,z),
+                 names_to = "tipo",
+                 values_to = "valor") %>%
+    mutate(ind = factor(ind,levels = 27:1)) %>% 
+    mutate(metodo = metodos[i])
+  
+  dflist[[i-1]] <- int_df 
+}
+
+bigdf <- dplyr::bind_rows(dflist) %>% 
+  mutate(metodo = factor(metodo,levels = metodos))
+
+ggplot(bigdf, aes(x = valor, y = ind)) +
+  geom_line() +
+  facet_grid(metodo ~ Dim) +
+  geom_point(aes(color = factor(tipo)),size = 1) +
+  scale_colour_manual(values = c("black","black","red")) +
+  labs(x = NULL,
+       y = NULL) +
+  theme_classic() +
+  theme(legend.position = "none",
+        axis.text.y = element_blank()) 
+
+```
+
+
